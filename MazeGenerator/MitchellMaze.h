@@ -24,6 +24,7 @@ public:
     int nRows() const ; // # rows
     int nCols() const ; // # cols
  
+    // Maze cell does not contain a wall
     bool IsEmpty(int i, int j) const ;
     
     void UpdateRobotLocs(const std::vector<point>& vp) ;
@@ -33,30 +34,36 @@ public:
 private:
     
     //start and end positions
-    int m_rowStart;
-    int m_rowEnd;
-    int m_columnStart;
-    int m_columnEnd;
+    Maze::point m_start;
+    Maze::point m_end;
+    
+    // number of rows and columns
     int m_numRows;
     int m_numColumns;
     
+    bool m_retry; 
+    
+    // Matrix to store empty and full cells of maze
     std::vector<std::vector<bool> > m_mazeMatrix;
+    
+    // Vector of points visited for maze backtracking
     std::vector<Maze::point> m_visitedPath;
 
     //overridden with my own version of GenerateMaze
     void GenerateMaze(int nr, int nc, const point& start, const point& end) ;
+
+    void initialiseMatrix(const int rowNumber, const int columnNumber);
+    void createBacktrackingMaze(Maze::point& point);
     
-    void printMaze(std::ostream& os , const int i, const int j) const;
+    Maze::point updateMazePoint(const int row, const int column, const Maze::point& diff);
     
-    void setUpMatrix(const int rowNumber, const int columnNumber);
-    
-    void solvable();
+    std::vector<Maze::point> checkValidNeighbours(const int row, const int column) const ;
     
     bool validRow(const int row) const;
     bool validColumn(const int column) const;
     bool isValid(const int row, const int column) const;
     
-    bool reachedStartEnd();
+    bool reachedStartEnd() const;
     
     // Do not want to allow mazes to be copied hence private copy constructor
     MitchellMaze(const MitchellMaze& m);

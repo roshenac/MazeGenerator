@@ -43,28 +43,24 @@ void MitchellMaze::UpdateRobotLocs(const std::vector<point>& vp)
     // TODO
 }
 
-void MitchellMaze::printMaze(std::ostream& os , const int i, const int j) const
-{
-    if(i == m_rowStart && j== m_columnStart)
-    {
-        os <<  "..";
-    }
-    else if(i == m_rowEnd && j== m_columnEnd)
-    {
-        os <<  "XX";
-    }else if(IsEmpty(i,j))
-    {
-        os <<  "  ";
-    } else{
-        os << "##";
-    }
-}
 
 std::ostream& MitchellMaze::Display(std::ostream& os) const
 {
     for (int i = 0; i < m_numRows; i++) {
         for (int j = 0; j < m_numColumns; j++) {
-            printMaze(os, i, j);
+            if(i == m_start.r && j== m_start.c)
+            {
+                os <<  "..";
+            }
+            else if(i == m_end.r && j== m_end.c)
+            {
+                os <<  "XX";
+            }else if(IsEmpty(i,j))
+            {
+                os <<  "  ";
+            } else{
+                os << "##";
+            }
         }
         os<< std::endl;
     }
@@ -76,19 +72,17 @@ std::ostream& MitchellMaze::Display(std::ostream& os) const
 //overridden with my own version of GenerateMaze
 void MitchellMaze::GenerateMaze(int nr, int nc, const point& start, const point& end)
 {
-    m_rowStart = start.r;
-    m_rowEnd = end.r;
-    m_columnStart=start.c;
-    m_columnEnd = end.c;
+    m_start = start;
+    m_end = end;
     m_numRows = nr;
     m_numColumns = nc;
     
     m_visitedPath.clear();
     
-    setUpMatrix(m_numRows, m_numColumns);
+    initialiseMatrix(m_numRows, m_numColumns);
 }
 
-void MitchellMaze::setUpMatrix(const int rowNumber, const int columnNumber)
+void MitchellMaze::initialiseMatrix(const int rowNumber, const int columnNumber)
 {
     std::vector<bool> columnMatrix(columnNumber);
     std::vector<std::vector<bool> > rowColumnMatrix(rowNumber, columnMatrix);
@@ -100,114 +94,110 @@ void MitchellMaze::setUpMatrix(const int rowNumber, const int columnNumber)
         }
     }
     
-    solvable();
+    createBacktrackingMaze(m_end);
 }
 
-// Back tracking method
-// Need to move by 2 steps in order to create path
-// in block maze
-void MitchellMaze::solvable()
+void MitchellMaze::createBacktrackingMaze(Maze::point& point)
 {
-    bool solved = false;
-    
-    Maze::point point(m_rowStart, m_columnStart);
-    
-    while(!solved)
+    m_retry = false;
+    bool mazeGenerated = false;
+    while(!mazeGenerated)
     {
-        int row = point.r;
-        int column = point.c;
+        std::vector<Maze::point> validNeighbours= checkValidNeighbours(point.r, point.c);
         
-   
-        std::vector<std::string> neighbours;
-        
-        // north
-        if(isValid(row-2, column) && (m_mazeMatrix[row-2][column] == 1)){
-            neighbours.push_back("north");
-        }
-        
-        // south
-        if(isValid(row+2, column)  && (m_mazeMatrix[row+2][column] == 1)){
-            neighbours.push_back("south");
-        }
-        
-        // east
-        if(isValid(row, column+2)  && (m_mazeMatrix[row][column+2] == 1)){
-            neighbours.push_back("east");
-        }
-        
-        // west
-        if(isValid(row, column-2)  && (m_mazeMatrix[row][column-2] == 1)){
-            neighbours.push_back("west");
-        }
-        
-        if(neighbours.size() > 0)
+        if(validNeighbours.size() > 0)
         {
-            int dir = rand() % (neighbours.size());
-            
-            if(neighbours[dir] == "north")
-            {
-                m_mazeMatrix[row-1][column] = 0;
-                m_mazeMatrix[row-2][column] = 0;
-                Maze::point newPoint(row-2, column);
-                m_visitedPath.push_back(newPoint);
-                point = newPoint;
-            }else if(neighbours[dir] == "south")
-            {
-                m_mazeMatrix[row+1][column] = 0;
-                m_mazeMatrix[row+2][column] = 0;
-                Maze::point newPoint(row+2, column);
-                m_visitedPath.push_back(newPoint);
-                point = newPoint;
-            }else if(neighbours[dir] == "east")
-            {
-                m_mazeMatrix[row][column+1] = 0;
-                m_mazeMatrix[row][column+2] = 0;
-                Maze::point newPoint(row, column+2);
-                m_visitedPath.push_back(newPoint);
-                point = newPoint;
-            }else if(neighbours[dir] == "west")
-            {
-                m_mazeMatrix[row][column-1] = 0;
-                m_mazeMatrix[row][column-2] = 0;
-                Maze::point newPoint(row, column-2);
-                m_visitedPath.push_back(newPoint);
-                point = newPoint;
-            }
-            
+            int dir = rand() % (validNeighbours.size());
+            point = updateMazePoint(point.r, point.c, validNeighbours[dir]);
         }else{
             if(m_visitedPath.size() > 1)
             {
                 m_visitedPath.pop_back();
-                Maze:: point p = m_visitedPath.back();
-                point = p ;
+                Maze:: point previousPoint = m_visitedPath.back();
+                point = previousPoint;
             }else{
                 if(!reachedStartEnd())
                 {
-                    std::cout<< "Unable to generate maze" << std::endl;
+                    m_mazeMatrix[m_start.r][m_start.c-1] = 0;
                 }
-                solved = true;
+                
+                mazeGenerated = true;
             }
         }
     }
 }
 
-// Check to make sure you can reach both start and end point
-bool MitchellMaze::reachedStartEnd()
+
+std::vector<Maze::point> MitchellMaze::checkValidNeighbours(const int row, const int column) const
 {
-    bool hasReachedStart = false;
-    bool hasReachedEnd = false;
+    std::vector<Maze::point> neighbours = {Maze::point(-2,0), Maze::point(2,0), Maze::point(0,2), Maze::point(0,-2)};
     
-    if(m_mazeMatrix[m_rowStart][m_columnStart] == 0 )
+    std::vector<Maze::point> validNeighbours;
+    
+    for(auto const& point: neighbours)
     {
-        hasReachedStart = true;
+        int newRow = row+ point.r;
+        int newColumn = column + point.c;
+        if(isValid(newRow, newColumn) && (m_mazeMatrix[newRow][newColumn] == 1)){
+            validNeighbours.push_back(point);
+        }
+    }
+    return validNeighbours;
+}
+
+Maze::point MitchellMaze::updateMazePoint(const int row, const int column, const Maze::point& diff)
+{
+    int columnDiff = diff.c;
+    int rowDiff = diff.r;
+    
+    
+    while(columnDiff != 0 || rowDiff != 0)
+    {
+        if(m_retry)
+        {
+            std::cout<< "retyr" <<std::endl;
+        }
+        
+        m_mazeMatrix[row + rowDiff][column + columnDiff] = 0;
+        if(columnDiff != 0 ){columnDiff = (diff.c < 0) ? (columnDiff +1 ) : (columnDiff - 1) ;}
+        if(rowDiff != 0){rowDiff = (diff.r < 0) ? (rowDiff +1 ) : (rowDiff - 1)  ;}
     }
     
-    if(m_mazeMatrix[m_rowStart][m_columnStart] == 0 )
+    Maze::point newPoint(row + diff.r, column + diff.c);
+    
+    
+    m_visitedPath.push_back(newPoint);
+    
+    
+    return newPoint;
+}
+
+// Check to make sure you can reach both start and end point
+bool MitchellMaze::reachedStartEnd() const
+{
+    bool reachedStart = false;
+    bool reachedEnd = false;
+    
+    std::vector<Maze::point> neighbours = {Maze::point(-1,0), Maze::point(1,0), Maze::point(0,1), Maze::point(0,-1), Maze::point(0,0)};
+    
+    for(auto const& point: neighbours)
     {
-        hasReachedEnd = true;
+        int newStartRow = m_start.r+ point.r;
+        int newStartColumn = m_start.c + point.c;
+        
+        int newEndRow = m_end.r+ point.r;
+        int newEndColumn = m_end.c + point.c;
+        
+        if(isValid(newStartRow, newStartColumn) && (m_mazeMatrix[newStartRow][newStartColumn] == 0)){
+            reachedStart = true;
+        }
+        
+        if(isValid(newEndRow, newEndColumn) && (m_mazeMatrix[newEndRow][newEndColumn] == 0)){
+            reachedEnd = true;
+        }
     }
     
-    return hasReachedStart && hasReachedEnd  ;
+    return reachedStart  && reachedEnd;
 }
 
 
