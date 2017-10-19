@@ -8,15 +8,9 @@
 
 #include "Maze.h"
 
-//Do not want to allow mazes to be copied hence private copy constructor
 Maze::Maze(const Maze& m)
 {
     Maze(m.nRows(), m.nCols(), m.m_start, m.m_end);
-}
-
-//Destructor
-Maze::~Maze()
-{
 }
 
 // Get info about maze
@@ -32,9 +26,10 @@ int Maze::nCols() const
     return m_numColumns;
 }
 
-bool Maze::IsEmpty(int i, int j) const
+// checks to see wether the given row, column is a maze wall or empty
+bool Maze::IsEmpty(int row, int column) const
 {
-    return not m_mazeMatrix[i][j];
+    return not m_mazeMatrix[row][column];
 }
 
 
@@ -46,18 +41,18 @@ void Maze::UpdateRobotLocs(const std::vector<point>& vp)
 
 std::ostream& Maze::Display(std::ostream& os) const
 {
-    for (int i = 0; i < m_numRows; i++)
+    for (int row = 0; row < m_numRows; row++)
     {
-        for (int j = 0; j < m_numColumns; j++)
+        for (int column = 0; column < m_numColumns; column++)
         {
-            if (i == m_start.r && j== m_start.c)
+            if (row == m_start.r && column== m_start.c)
             {
                 os <<  "..";
             }
-            else if (i == m_end.r && j== m_end.c)
+            else if (row == m_end.r && column== m_end.c)
             {
                 os <<  "XX";
-            }else if (IsEmpty(i, j))
+            }else if (IsEmpty(row, column))
             {
                 os <<  "  ";
             } else
@@ -80,6 +75,7 @@ void Maze::GenerateMaze(int nr, int nc, const point& start, const point& end)
     m_numRows = nr;
     m_numColumns = nc;
     
+    // clear the vector of already visited points
     m_visitedPath.clear();
     
     initialiseMatrix(m_numRows, m_numColumns);
@@ -91,11 +87,12 @@ void Maze::initialiseMatrix(const int rowNumber, const int columnNumber)
     std::vector<std::vector<bool> > rowColumnMatrix(rowNumber, columnMatrix);
     m_mazeMatrix = rowColumnMatrix;
     
-    for (int i = 0; i < rowNumber; i++)
+    for (int row = 0; row < rowNumber; row++)
     {
-        for (int j = 0; j < columnNumber; j++)
+        for (int column = 0; column < columnNumber; column++)
         {
-            m_mazeMatrix[i][j] = 1;
+            // Initialise all the points in the maze to be walls
+            m_mazeMatrix[row][column] = 1;
         }
     }
     
@@ -104,7 +101,6 @@ void Maze::initialiseMatrix(const int rowNumber, const int columnNumber)
 
 void Maze::createBacktrackingMaze(point& point)
 {
-    m_retry = false;
     bool mazeGenerated = false;
     while (not mazeGenerated)
     {
@@ -112,12 +108,19 @@ void Maze::createBacktrackingMaze(point& point)
         
         if (validNeighbours.size() > 0)
         {
+            // chose a random valid neighbour
             int dir = rand() % (validNeighbours.size());
-            point = updateMazePoint(point.r, point.c, validNeighbours[dir]);
+            Maze::point diff = validNeighbours[dir];
+            markPointAsVisited(point.r, point.c, diff);
+            Maze::point newPoint(point.r + diff.r, point.c + diff.c);
+            // step to next point
+            point = newPoint;
         }else
         {
+            // if there are no valid neighbours
             if (m_visitedPath.size() > 1)
             {
+                // backtrack to the last visited point
                 m_visitedPath.pop_back();
                 Maze::point previousPoint = m_visitedPath.back();
                 point = previousPoint;
@@ -125,6 +128,8 @@ void Maze::createBacktrackingMaze(point& point)
             {
                 if (not reachedStartEnd())
                 {
+                    // If the start is surrounded by wall, knock down one neighouring wall
+                    // so that the start point is part of the maze
                     m_mazeMatrix[m_start.r][m_start.c-1] = 0;
                 }
                 
@@ -144,7 +149,7 @@ std::vector<Maze::point> Maze::checkValidNeighbours(const int row, const int col
     
     for (auto const& point: neighbours)
     {
-        int newRow = row+ point.r;
+        int newRow = row + point.r;
         int newColumn = column + point.c;
         if (isValid(newRow, newColumn) && (m_mazeMatrix[newRow][newColumn] == 1))
         {
@@ -154,11 +159,10 @@ std::vector<Maze::point> Maze::checkValidNeighbours(const int row, const int col
     return validNeighbours;
 }
 
-Maze::point Maze::updateMazePoint(const int row, const int column, const point& diff)
+void Maze::markPointAsVisited(const int row, const int column, const point& diff)
 {
     int columnDiff = diff.c;
     int rowDiff = diff.r;
-    
     
     while (columnDiff != 0 || rowDiff != 0)
     {
@@ -167,16 +171,11 @@ Maze::point Maze::updateMazePoint(const int row, const int column, const point& 
         if (rowDiff != 0){rowDiff = (diff.r < 0) ? (rowDiff +1 ) : (rowDiff - 1);}
     }
     
-    point newPoint(row + diff.r, column + diff.c);
-    
-    
-    m_visitedPath.push_back(newPoint);
-    
-    
-    return newPoint;
+    m_visitedPath.push_back(point(row + diff.r, column + diff.c));
 }
 
 // Check to make sure you can reach both start and end point
+// by checking the start and end and its surrounding neighbours
 bool Maze::reachedStartEnd() const
 {
     bool reachedStart = false;
